@@ -129,12 +129,20 @@ fun AppDetailScreen(packageName: String, viewModel: AppDetailViewModel, onBackCl
                         Spacer(modifier = Modifier.height(24.dp))
                         
                         // Action Buttons
+                        val context = androidx.compose.ui.platform.LocalContext.current
+                        val openSettings = {
+                            val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = android.net.Uri.fromParts("package", app.packageName, null)
+                            }
+                            context.startActivity(intent)
+                        }
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             Button(
-                                onClick = { /* TODO */ },
+                                onClick = openSettings,
                                 modifier = Modifier.weight(1f).height(48.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                                 shape = RoundedCornerShape(12.dp)
@@ -144,7 +152,7 @@ fun AppDetailScreen(packageName: String, viewModel: AppDetailViewModel, onBackCl
                                 Text("App Settings", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Button(
-                                onClick = { /* TODO */ },
+                                onClick = { viewModel.loadAppDetails(app.packageName) },
                                 modifier = Modifier.weight(1f).height(48.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                                 shape = RoundedCornerShape(12.dp)
@@ -176,11 +184,11 @@ fun AppDetailScreen(packageName: String, viewModel: AppDetailViewModel, onBackCl
                                 
                                 // Real data point
                                 RiskBulletPoint(app.riskReason)
-                                // Placeholders
-                                Spacer(modifier = Modifier.height(12.dp))
-                                RiskBulletPoint("May run background services indefinitely.")
-                                Spacer(modifier = Modifier.height(12.dp))
-                                RiskBulletPoint("Syncs local data with external servers.")
+                                
+                                if (app.isSideloaded) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    RiskBulletPoint("Installed from an unofficial or third-party source.")
+                                }
                             }
                         }
                     }
@@ -227,12 +235,18 @@ fun AppDetailScreen(packageName: String, viewModel: AppDetailViewModel, onBackCl
 
                 // Bottom Buttons
                 item {
+                    val context = androidx.compose.ui.platform.LocalContext.current
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Button(
-                            onClick = { /* TODO */ },
+                            onClick = { 
+                                val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                    data = android.net.Uri.fromParts("package", app.packageName, null)
+                                }
+                                context.startActivity(intent)
+                            },
                             modifier = Modifier.fillMaxWidth().height(56.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary), // Purple
                             shape = RoundedCornerShape(16.dp)
@@ -244,7 +258,7 @@ fun AppDetailScreen(packageName: String, viewModel: AppDetailViewModel, onBackCl
                             text = "Rescan this Application",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.labelLarge,
-                            modifier = Modifier.clickable { /* TODO */ }.padding(8.dp)
+                            modifier = Modifier.clickable { viewModel.loadAppDetails(app.packageName) }.padding(8.dp)
                         )
                     }
                 }

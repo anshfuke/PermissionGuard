@@ -34,6 +34,11 @@ class AppsViewModel(private val appScanner: AppScanner) : ViewModel() {
         scanApps()
     }
 
+    fun refresh() {
+        appScanner.clearCache()
+        scanApps()
+    }
+
     fun scanApps() {
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.value = AppsUiState.Loading

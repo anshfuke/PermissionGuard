@@ -67,7 +67,8 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
                     contentDescription = "Scan",
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable { viewModel.refresh() }
                 )
             }
         }
@@ -196,7 +197,7 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
             }
         }
 
-        // Recent Activity Placeholder
+        // Recent Activity
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -217,13 +218,25 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("WhatsApp", color = Color.White, fontWeight = FontWeight.Bold)
-                    Text("Background Camera access • 2m ago", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Divider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text("Instagram", color = Color.White, fontWeight = FontWeight.Bold)
-                    Text("Accessed precise location • 15m ago", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    if (uiState.recentEvents.isEmpty()) {
+                        Text("No recent activity.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        val format = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault())
+                        uiState.recentEvents.forEachIndexed { index, event ->
+                            val timeString = format.format(java.util.Date(event.timestamp))
+                            val isMic = event.permissionType.contains("AUDIO", ignoreCase = true)
+                            val type = if (isMic) "Microphone access" else "Camera access"
+                            
+                            Text(event.packageName, color = Color.White, fontWeight = FontWeight.Bold)
+                            Text("$type • $timeString", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                            
+                            if (index < uiState.recentEvents.size - 1) {
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Divider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
+                                Spacer(modifier = Modifier.height(12.dp))
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -242,7 +255,7 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                         Text("Privacy Tip", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            "You have ${uiState.highRiskApps} apps using sensitive permissions. Consider revoking permissions for apps you don't use frequently.",
+                            uiState.privacyTip,
                             color = Color(0xCCFFFFFF),
                             style = MaterialTheme.typography.bodySmall
                         )

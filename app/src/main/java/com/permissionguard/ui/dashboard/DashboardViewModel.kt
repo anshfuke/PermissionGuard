@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.permissionguard.data.repository.PermissionRepository
 import com.permissionguard.domain.model.RiskLevel
 import com.permissionguard.domain.scanner.AppScanner
+import com.permissionguard.domain.model.PermissionEvent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,6 +20,8 @@ data class DashboardUiState(
     val securityScore: Int = 100,
     val totalLoggedEvents: Int = 0,
     val totalDangerousPermissions: Int = 0,
+    val recentEvents: List<PermissionEvent> = emptyList(),
+    val privacyTip: String = "",
     val isLoading: Boolean = true
 )
 
@@ -35,6 +38,12 @@ class DashboardViewModel(
         observeEvents()
     }
 
+    fun refresh() {
+        _uiState.value = _uiState.value.copy(isLoading = true)
+        appScanner.clearCache()
+        loadDashboardData()
+    }
+
     private fun loadDashboardData() {
         viewModelScope.launch(Dispatchers.IO) {
             val apps = appScanner.getInstalledApps()
@@ -42,11 +51,18 @@ class DashboardViewModel(
             val medium = apps.count { it.riskLevel == RiskLevel.MEDIUM }
             val low = apps.count { it.riskLevel == RiskLevel.LOW }
             
-            // Calculate a score from 0-100 based on app risk
-            val penalty = (high * 15) + (medium * 5)
-            val finalScore = (100 - penalty).coerceIn(0, 100)
+            // Calculate score as the percentage of Safe (Low Risk) apps out of Total apps
+            val finalScore = if (apps.isNotEmpty()) {
+                ((low.toFloat() / apps.size) * 100).toInt().coerceIn(0, 100)
+            } else {
+                100
+            }
             
             val totalDanger = apps.sumOf { it.dangerousPermissions.size }
+            
+            val tip = if (high > 0) "You have $high high-risk apps. Consider revoking unused permissions."
+            else if (medium > 0) "Review permissions for your $medium medium-risk apps."
+            else "Great job! All your apps are considered low risk."
             
             _uiState.value = _uiState.value.copy(
                 totalApps = apps.size,
@@ -55,6 +71,7 @@ class DashboardViewModel(
                 lowRiskApps = low,
                 securityScore = finalScore,
                 totalDangerousPermissions = totalDanger,
+                privacyTip = tip,
                 isLoading = false
             )
         }
@@ -64,7 +81,8 @@ class DashboardViewModel(
         viewModelScope.launch {
             repository.getAllEvents().collect { events ->
                 _uiState.value = _uiState.value.copy(
-                    totalLoggedEvents = events.size
+                    totalLoggedEvents = events.size,
+                    recentEvents = events.take(2)
                 )
             }
         }

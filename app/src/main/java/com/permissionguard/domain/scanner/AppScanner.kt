@@ -20,6 +20,10 @@ class AppScanner(private val context: Context) {
         return fingerprint
     }
 
+    fun clearCache() {
+        cachedApps = null
+    }
+
     fun getInstalledApps(): List<AppInfo> {
         val packageManager = context.packageManager
         val packages = packageManager.getInstalledPackages(PackageManager.GET_PERMISSIONS)
@@ -75,6 +79,10 @@ class AppScanner(private val context: Context) {
                 packageManager.getInstallerPackageName(packageInfo.packageName)
             }
             
+            val isFromPlayStore = installSource == "com.android.vending"
+            val isFromKnownStore = installSource == "com.sec.android.app.samsungapps" || installSource == "com.amazon.venezia" || installSource == "com.heytap.market"
+            val isSideloaded = !isFromPlayStore && !isFromKnownStore && installSource != null
+            
             val riskLevel = calculateRiskLevel(dangerousRequested, installSource)
             val riskReason = generateRiskReason(dangerousRequested)
             
@@ -94,6 +102,7 @@ class AppScanner(private val context: Context) {
                     dangerousPermissions = dangerousRequested,
                     riskLevel = riskLevel,
                     riskReason = riskReason,
+                    isSideloaded = isSideloaded,
                     icon = iconBitmap
                 )
             )
@@ -133,18 +142,19 @@ class AppScanner(private val context: Context) {
         if (dangerousPermissions.any { it.contains("SMS") }) score += 4
         if (dangerousPermissions.any { it.contains("CALL_LOG") }) score += 4
 
-        // Sideloaded Penalty (+4 points)
+        // Sideloaded Penalty (+2 points instead of 4 to prevent over-penalizing)
         val isFromPlayStore = installSource == "com.android.vending"
-        val isFromKnownStore = installSource == "com.sec.android.app.samsungapps" || installSource == "com.amazon.venezia"
+        val isFromKnownStore = installSource == "com.sec.android.app.samsungapps" || installSource == "com.amazon.venezia" || installSource == "com.heytap.market"
         
-        // If it's not from a recognized safe store, add penalty
-        if (!isFromPlayStore && !isFromKnownStore) {
-            score += 4
+        // If it's not from a recognized safe store, add a minor penalty
+        // We only penalize if it's explicitly not from a safe store, and we don't penalize ADB installs (null) as harshly
+        if (!isFromPlayStore && !isFromKnownStore && installSource != null) {
+            score += 2
         }
 
         return when {
-            score >= 8 -> RiskLevel.HIGH
-            score in 4..7 -> RiskLevel.MEDIUM
+            score >= 9 -> RiskLevel.HIGH
+            score in 5..8 -> RiskLevel.MEDIUM
             else -> RiskLevel.LOW
         }
     }

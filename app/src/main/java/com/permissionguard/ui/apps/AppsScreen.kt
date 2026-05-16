@@ -141,7 +141,7 @@ fun AppsScreen(viewModel: AppsViewModel, onAppClick: (String) -> Unit) {
                         letterSpacing = 1.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { /* Handle rescan */ }) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { viewModel.refresh() }) {
                         Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Rescan", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)

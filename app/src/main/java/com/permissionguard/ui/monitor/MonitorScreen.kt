@@ -152,14 +152,34 @@ fun MonitorScreen(viewModel: MonitorViewModel) {
                 }
             }
 
-            // Live Status Placeholder
+            // Live Status
             item {
                 Column {
                     Text("LIVE STATUS", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                     Spacer(modifier = Modifier.height(12.dp))
+                    
+                    val now = System.currentTimeMillis()
+                    val twoMins = 2 * 60 * 1000L
+                    
+                    val recentMicEvent = events.firstOrNull { it.permissionType.contains("AUDIO", ignoreCase = true) }
+                    val isMicActive = recentMicEvent != null && (now - recentMicEvent.timestamp) < twoMins
+                    val micStatusStr = if (isMicActive) "In Use" else "Idle"
+                    val micTimeStr = recentMicEvent?.let { 
+                        val diffMins = (now - it.timestamp) / 60000 
+                        if (diffMins < 1) "JUST NOW" else "$diffMins MINS AGO"
+                    } ?: "NO RECENT DATA"
+                    
+                    val recentCamEvent = events.firstOrNull { it.permissionType.contains("CAMERA", ignoreCase = true) }
+                    val isCamActive = recentCamEvent != null && (now - recentCamEvent.timestamp) < twoMins
+                    val camStatusStr = if (isCamActive) "In Use" else "Idle"
+                    val camTimeStr = recentCamEvent?.let { 
+                        val diffMins = (now - it.timestamp) / 60000 
+                        if (diffMins < 1) "JUST NOW" else "$diffMins MINS AGO"
+                    } ?: "NO RECENT DATA"
+
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        LiveStatusCard(modifier = Modifier.weight(1f), icon = Icons.Default.Call, title = "Microphone", status = "In Use", time = "2 MINS AGO", isActive = true) // Mic
-                        LiveStatusCard(modifier = Modifier.weight(1f), icon = Icons.Default.AccountCircle, title = "Camera", status = "Idle", time = "1 HOUR AGO", isActive = false) // Camera
+                        LiveStatusCard(modifier = Modifier.weight(1f), icon = Icons.Default.Call, title = "Microphone", status = micStatusStr, time = micTimeStr, isActive = isMicActive)
+                        LiveStatusCard(modifier = Modifier.weight(1f), icon = Icons.Default.AccountCircle, title = "Camera", status = camStatusStr, time = camTimeStr, isActive = isCamActive)
                     }
                 }
             }

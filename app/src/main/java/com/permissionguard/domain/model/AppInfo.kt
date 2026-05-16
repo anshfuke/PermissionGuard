@@ -13,5 +13,6 @@ data class AppInfo(
     val dangerousPermissions: List<String>,
     val riskLevel: RiskLevel,
     val riskReason: String,
+    val isSideloaded: Boolean = false,
     val icon: android.graphics.Bitmap? = null
 )
