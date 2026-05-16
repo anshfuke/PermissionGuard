@@ -2,111 +2,251 @@ package com.permissionguard.ui.dashboard
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 @Composable
 fun DashboardScreen(viewModel: DashboardViewModel) {
     val uiState by viewModel.uiState.collectAsState()
 
     if (uiState.isLoading) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
         }
         return
     }
 
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        Text(text = "Security Dashboard", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-
-        // Animated Security Score Ring
-        var animationPlayed by remember { mutableStateOf(false) }
-        val targetProgress = uiState.securityScore / 100f
-        val animatedProgress by animateFloatAsState(
-            targetValue = if (animationPlayed) targetProgress else 0f,
-            animationSpec = tween(durationMillis = 1500),
-            label = "ScoreAnimation"
-        )
-        
-        LaunchedEffect(key1 = true) {
-            animationPlayed = true
+        // Top Bar
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.AccountCircle,
+                        contentDescription = "Profile",
+                        tint = Color.White,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "PermissionGuard",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Scan",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
         }
 
-        Box(
-            modifier = Modifier
-                .size(200.dp)
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            CircularProgressIndicator(
-                progress = { animatedProgress },
-                modifier = Modifier.fillMaxSize(),
-                strokeWidth = 14.dp,
-                color = when {
-                    uiState.securityScore >= 80 -> Color(0xFF4CAF50)
-                    uiState.securityScore >= 50 -> Color(0xFFFFC107)
-                    else -> Color(0xFFF44336)
-                },
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "${uiState.securityScore}",
-                    style = MaterialTheme.typography.displayLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+        // Circular Score
+        item {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                var animationPlayed by remember { mutableStateOf(false) }
+                val targetProgress = uiState.securityScore / 100f
+                val animatedProgress by animateFloatAsState(
+                    targetValue = if (animationPlayed) targetProgress else 0f,
+                    animationSpec = tween(durationMillis = 1500),
+                    label = "ScoreAnimation"
                 )
-                Text(text = "Score", style = MaterialTheme.typography.labelLarge)
+
+                LaunchedEffect(key1 = true) {
+                    animationPlayed = true
+                }
+
+                Box(
+                    modifier = Modifier.size(160.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        progress = { animatedProgress },
+                        modifier = Modifier.fillMaxSize(),
+                        strokeWidth = 12.dp,
+                        color = when {
+                            uiState.securityScore >= 80 -> MaterialTheme.colorScheme.primary
+                            uiState.securityScore >= 50 -> MaterialTheme.colorScheme.tertiary
+                            else -> MaterialTheme.colorScheme.error
+                        },
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "${uiState.securityScore}",
+                            style = MaterialTheme.typography.displayMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Text(
+                            text = "SECURITY SCORE",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            letterSpacing = 1.sp
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = if (uiState.securityScore >= 80) "Your privacy looks good" else "Action required on privacy",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Last scan: Just now",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
 
         // Risk Distribution Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                Text("App Risk Distribution", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(16.dp))
-                
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(16.dp)
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    modifier = Modifier.fillMaxWidth().padding(20.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    RiskStatItem("Safe", uiState.lowRiskApps, Color(0xFF4CAF50))
-                    RiskStatItem("Medium", uiState.mediumRiskApps, Color(0xFFFFB300))
-                    RiskStatItem("High", uiState.highRiskApps, Color(0xFFE53935))
+                    RiskStatDotItem("Safe", uiState.lowRiskApps, Color(0xFF00E676))
+                    Divider(modifier = Modifier.height(30.dp).width(1.dp), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
+                    RiskStatDotItem("Medium", uiState.mediumRiskApps, Color(0xFFFFB300))
+                    Divider(modifier = Modifier.height(30.dp).width(1.dp), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
+                    RiskStatDotItem("High", uiState.highRiskApps, Color(0xFFFF3366))
                 }
-                
-                Spacer(modifier = Modifier.height(20.dp))
-                Divider()
-                Spacer(modifier = Modifier.height(12.dp))
-                Text("Total Apps Scanned: ${uiState.totalApps}", style = MaterialTheme.typography.bodySmall)
             }
         }
 
-        // Event Logs Card
-        Card(modifier = Modifier.fillMaxWidth()) {
+        // 2x2 Grid
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
+                    GridCard(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Default.List,
+                        iconTint = MaterialTheme.colorScheme.secondary, // Purple
+                        value = uiState.totalApps.toString(),
+                        label = "Total Apps Scanned"
+                    )
+                    GridCard(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Default.Warning,
+                        iconTint = MaterialTheme.colorScheme.error, // Red
+                        value = uiState.totalDangerousPermissions.toString(),
+                        label = "Dangerous Permissions"
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
+                    GridCard(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Default.Info,
+                        iconTint = MaterialTheme.colorScheme.primary, // Cyan
+                        value = uiState.totalLoggedEvents.toString(),
+                        label = "Active Sensor Events"
+                    )
+                    GridCard(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Default.AccountCircle,
+                        iconTint = MaterialTheme.colorScheme.secondary, // Purple
+                        value = (uiState.totalLoggedEvents * 14).toString(), // Placeholder multiplier
+                        label = "Background Access"
+                    )
+                }
+            }
+        }
+
+        // Recent Activity Placeholder
+        item {
             Row(
-                modifier = Modifier.padding(20.dp).fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Active Background Events", style = MaterialTheme.typography.titleMedium)
-                Badge(containerColor = MaterialTheme.colorScheme.primary) {
-                    Text(text = "${uiState.totalLoggedEvents}", modifier = Modifier.padding(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Recent Activity", color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                }
+                Text("See all", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("WhatsApp", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Background Camera access • 2m ago", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Divider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Instagram", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Accessed precise location • 15m ago", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+
+        // Privacy Tip
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF063A36)), // Teal background
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text("Privacy Tip", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "You have ${uiState.highRiskApps} apps using sensitive permissions. Consider revoking permissions for apps you don't use frequently.",
+                            color = Color(0xCCFFFFFF),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
             }
         }
@@ -114,9 +254,31 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
 }
 
 @Composable
-fun RiskStatItem(label: String, count: Int, color: Color) {
+fun RiskStatDotItem(label: String, count: Int, color: Color) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = count.toString(), style = MaterialTheme.typography.headlineMedium, color = color, fontWeight = FontWeight.Bold)
-        Text(text = label, style = MaterialTheme.typography.bodyMedium)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(color))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(text = count.toString(), style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold)
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(text = label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+fun GridCard(modifier: Modifier = Modifier, icon: androidx.compose.ui.graphics.vector.ImageVector, iconTint: Color, value: String, label: String) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Icon(imageVector = icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(24.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(text = value, style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(text = label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }

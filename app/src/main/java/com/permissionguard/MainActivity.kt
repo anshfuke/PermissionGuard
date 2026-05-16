@@ -25,6 +25,7 @@ import com.permissionguard.ui.dashboard.DashboardViewModel
 import com.permissionguard.ui.monitor.MonitorScreen
 import com.permissionguard.ui.monitor.MonitorViewModel
 import com.permissionguard.ui.navigation.Screen
+import com.permissionguard.ui.theme.PermissionGuardTheme
 
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
@@ -37,7 +38,7 @@ class MainActivity : ComponentActivity() {
         val viewModelFactory = ViewModelFactory(appContainer)
         
         setContent {
-            MaterialTheme {
+            PermissionGuardTheme {
                 PermissionGuardApp(viewModelFactory)
             }
         }
@@ -56,24 +57,27 @@ fun PermissionGuardApp(viewModelFactory: ViewModelFactory) {
     )
     
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("PermissionGuard") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            )
-        },
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            NavigationBar {
+            NavigationBar(
+                containerColor = MaterialTheme.colorScheme.background,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            ) {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentDestination = navBackStackEntry?.destination
                 items.forEach { screen ->
+                    val isSelected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
                     NavigationBarItem(
                         icon = { Icon(screen.icon, contentDescription = screen.title) },
-                        label = { Text(screen.title) },
-                        selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
+                        label = { Text(screen.title, style = MaterialTheme.typography.labelSmall) },
+                        selected = isSelected,
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.surfaceVariant,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
                         onClick = {
                             navController.navigate(screen.route) {
                                 popUpTo(navController.graph.findStartDestination().id) {

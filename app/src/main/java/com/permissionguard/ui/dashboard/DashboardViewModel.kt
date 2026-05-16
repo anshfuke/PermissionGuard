@@ -18,6 +18,7 @@ data class DashboardUiState(
     val lowRiskApps: Int = 0,
     val securityScore: Int = 100,
     val totalLoggedEvents: Int = 0,
+    val totalDangerousPermissions: Int = 0,
     val isLoading: Boolean = true
 )
 
@@ -45,12 +46,15 @@ class DashboardViewModel(
             val penalty = (high * 15) + (medium * 5)
             val finalScore = (100 - penalty).coerceIn(0, 100)
             
+            val totalDanger = apps.sumOf { it.dangerousPermissions.size }
+            
             _uiState.value = _uiState.value.copy(
                 totalApps = apps.size,
                 highRiskApps = high,
                 mediumRiskApps = medium,
                 lowRiskApps = low,
                 securityScore = finalScore,
+                totalDangerousPermissions = totalDanger,
                 isLoading = false
             )
         }
