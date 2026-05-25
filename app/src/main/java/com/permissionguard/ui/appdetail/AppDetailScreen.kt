@@ -30,6 +30,8 @@ import com.permissionguard.domain.model.RiskLevel
 fun AppDetailScreen(packageName: String, viewModel: AppDetailViewModel, onBackClick: () -> Unit) {
     val appInfo by viewModel.appInfo.collectAsState()
     val permissionDetails by viewModel.permissionDetails.collectAsState()
+    
+    var showDictionary by remember { mutableStateOf(false) }
 
     LaunchedEffect(packageName) {
         viewModel.loadAppDetails(packageName)
@@ -68,11 +70,13 @@ fun AppDetailScreen(packageName: String, viewModel: AppDetailViewModel, onBackCl
                         style = MaterialTheme.typography.titleLarge
                     )
                 }
-                Icon(
-                    imageVector = Icons.Default.Search, // Or scanner focus icon placeholder
-                    contentDescription = "Scan",
-                    tint = MaterialTheme.colorScheme.primary
-                )
+                IconButton(onClick = { viewModel.loadAppDetails(app.packageName) }) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Rescan",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
 
             LazyColumn(
@@ -208,21 +212,25 @@ fun AppDetailScreen(packageName: String, viewModel: AppDetailViewModel, onBackCl
                         }
                         Surface(
                             color = MaterialTheme.colorScheme.surfaceVariant,
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.clickable { showDictionary = true }
                         ) {
-                            Text(
-                                text = "${permissionDetails.size} Found",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                                Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Dictionary",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
                         }
                     }
                 }
 
                 // Permission Cards
                 items(permissionDetails) { entry ->
-                    PermissionCardItem(entry)
+                    PermissionCardItem(entry, onDictionaryClick = { showDictionary = true })
                 }
 
                 if (permissionDetails.isEmpty()) {
@@ -265,6 +273,55 @@ fun AppDetailScreen(packageName: String, viewModel: AppDetailViewModel, onBackCl
             }
         }
     }
+
+    if (showDictionary) {
+        ModalBottomSheet(
+            onDismissRequest = { showDictionary = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.8f).padding(16.dp)) {
+                Text("Permission Dictionary", style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Learn what different Android permissions do and why they might be risky.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                var searchQuery by remember { mutableStateOf("") }
+                val filteredPermissions = remember(searchQuery) {
+                    com.permissionguard.utils.PermissionDatabase.allPermissions.filter {
+                        it.name.contains(searchQuery, ignoreCase = true) ||
+                        it.id.contains(searchQuery, ignoreCase = true) ||
+                        it.description.contains(searchQuery, ignoreCase = true)
+                    }
+                }
+
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                    placeholder = { Text("Search permissions...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        cursorColor = MaterialTheme.colorScheme.primary
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(filteredPermissions) { entry ->
+                        PermissionCardItem(entry = entry, onDictionaryClick = null, isDictionaryMode = true)
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -277,8 +334,8 @@ fun RiskBulletPoint(text: String) {
 }
 
 @Composable
-fun PermissionCardItem(entry: PermissionEntry) {
-    var expanded by remember { mutableStateOf(false) }
+fun PermissionCardItem(entry: PermissionEntry, onDictionaryClick: (() -> Unit)? = null, isDictionaryMode: Boolean = false) {
+    var expanded by remember { mutableStateOf(isDictionaryMode) }
     
     val riskColor = when (entry.riskLevel) {
         RiskLevel.HIGH -> Color(0xFFFF3366)
@@ -353,10 +410,12 @@ fun PermissionCardItem(entry: PermissionEntry) {
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(text = entry.description, style = MaterialTheme.typography.bodyMedium, color = Color.White, lineHeight = 20.sp)
                     Spacer(modifier = Modifier.height(16.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("DETAILED ANALYSIS AVAILABLE", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    if (!isDictionaryMode && onDictionaryClick != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { onDictionaryClick() }.padding(vertical = 4.dp)) {
+                            Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("BROWSE FULL DICTIONARY", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
