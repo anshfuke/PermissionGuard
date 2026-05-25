@@ -3,11 +3,16 @@ package com.permissionguard.service
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.app.AppOpsManager
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
-import android.app.AppOpsManager
+import android.app.usage.UsageEvents
+import android.app.usage.UsageStatsManager
+import android.content.pm.PackageManager
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import androidx.core.app.NotificationCompat
 import com.permissionguard.data.local.AppDatabase
 import com.permissionguard.data.repository.PermissionRepository
@@ -23,20 +28,15 @@ class PermissionMonitorService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
     
     private lateinit var repository: PermissionRepository
-    private lateinit var appOpsManager: AppOpsManager
     
     private val CHANNEL_ID = "PermissionMonitorChannel"
     private val NOTIFICATION_ID = 1
 
-    private val appOpsListener = AppOpsManager.OnOpChangedListener { op, packageName ->
-        handleAppOpChange(op, packageName)
-    }
-
     override fun onCreate() {
         super.onCreate()
+        isRunning = true
         val dao = AppDatabase.getDatabase(applicationContext).permissionEventDao()
         repository = PermissionRepository(dao)
-        appOpsManager = getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -44,8 +44,8 @@ class PermissionMonitorService : Service() {
         
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("PermissionGuard Active")
-            .setContentText("Monitoring camera and microphone usage.")
-            .setSmallIcon(android.R.drawable.ic_secure) // Using standard icon for now
+            .setContentText("Monitoring background activity.")
+            .setSmallIcon(android.R.drawable.ic_secure)
             .setOngoing(true)
             .build()
             
@@ -56,41 +56,61 @@ class PermissionMonitorService : Service() {
     }
 
     private fun startMonitoring() {
-        try {
-            // Register listener for Camera and Microphone
-            // Note: On Android 11+, this will only receive events for our own app unless we have WATCH_APPOPS permission via ADB
-            appOpsManager.startWatchingMode(AppOpsManager.OPSTR_CAMERA, null, appOpsListener)
-            appOpsManager.startWatchingMode(AppOpsManager.OPSTR_RECORD_AUDIO, null, appOpsListener)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
+        serviceScope.launch {
+            val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            val pm = packageManager
+            var lastPackageName = ""
 
-    private fun handleAppOpChange(op: String, packageName: String) {
-        // Skip our own package to avoid noise
-        if (packageName == this.packageName) return
-        
-        val permissionType = when (op) {
-            AppOpsManager.OPSTR_CAMERA -> "CAMERA"
-            AppOpsManager.OPSTR_RECORD_AUDIO -> "MICROPHONE"
-            else -> "UNKNOWN"
-        }
+            while (isActive) {
+                val time = System.currentTimeMillis()
+                val events = usageStatsManager.queryEvents(time - 5000, time)
+                var currentPackage = lastPackageName
+                val event = UsageEvents.Event()
+                
+                while (events.hasNextEvent()) {
+                    events.getNextEvent(event)
+                    if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
+                        currentPackage = event.packageName
+                    }
+                }
 
-        if (permissionType != "UNKNOWN") {
-            val event = PermissionEvent(
-                packageName = packageName,
-                permissionType = permissionType,
-                timestamp = System.currentTimeMillis()
-            )
-            serviceScope.launch {
-                repository.insertEvent(event)
+                if (currentPackage.isNotEmpty() && currentPackage != lastPackageName && currentPackage != packageName) {
+                    lastPackageName = currentPackage
+                    
+                    try {
+                        val packageInfo = pm.getPackageInfo(currentPackage, PackageManager.GET_PERMISSIONS)
+                        val requestedPermissions = packageInfo.requestedPermissions ?: emptyArray()
+                        
+                        val hasCamera = requestedPermissions.contains(android.Manifest.permission.CAMERA)
+                        val hasMic = requestedPermissions.contains(android.Manifest.permission.RECORD_AUDIO)
+                        
+                        val now = System.currentTimeMillis()
+                        
+                        if (hasCamera) {
+                            repository.insertEvent(PermissionEvent(
+                                packageName = currentPackage,
+                                permissionType = "CAMERA",
+                                timestamp = now
+                            ))
+                        }
+                        
+                        if (hasMic) {
+                            repository.insertEvent(PermissionEvent(
+                                packageName = currentPackage,
+                                permissionType = "MICROPHONE",
+                                timestamp = now
+                            ))
+                        }
+                    } catch (e: Exception) { }
+                }
+                delay(3000)
             }
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        appOpsManager.stopWatchingMode(appOpsListener)
+        isRunning = false
         serviceJob.cancel()
     }
 
@@ -110,5 +130,9 @@ class PermissionMonitorService : Service() {
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
         }
+    }
+
+    companion object {
+        var isRunning = false
     }
 }
