@@ -6,6 +6,7 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,6 +17,7 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,7 +37,11 @@ import java.util.*
 fun MonitorScreen(viewModel: MonitorViewModel) {
     val context = LocalContext.current
     val events by viewModel.events.collectAsState()
+    val filteredEvents by viewModel.filteredEvents.collectAsState()
+    val selectedFilter by viewModel.selectedFilter.collectAsState()
     val isServiceRunning by viewModel.isServiceRunning.collectAsState()
+
+    var showHelpDialog by remember { mutableStateOf(false) }
 
     var hasNotificationPermission by remember {
         mutableStateOf(
@@ -86,9 +92,10 @@ fun MonitorScreen(viewModel: MonitorViewModel) {
                 )
             }
             Icon(
-                imageVector = Icons.Default.Search,
-                contentDescription = "Scan",
-                tint = MaterialTheme.colorScheme.primary
+                imageVector = Icons.Default.Info,
+                contentDescription = "Help",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.clickable { showHelpDialog = true }
             )
         }
 
@@ -161,8 +168,8 @@ fun MonitorScreen(viewModel: MonitorViewModel) {
                     val now = System.currentTimeMillis()
                     val twoMins = 2 * 60 * 1000L
                     
-                    val recentMicEvent = events.firstOrNull { it.permissionType.contains("AUDIO", ignoreCase = true) }
-                    val isMicActive = recentMicEvent != null && (now - recentMicEvent.timestamp) < twoMins
+                    val recentMicEvent = events.firstOrNull { it.permissionType.contains("AUDIO", ignoreCase = true) || it.permissionType.contains("MICROPHONE", ignoreCase = true) }
+                    val isMicActive = isServiceRunning && recentMicEvent != null && (now - recentMicEvent.timestamp) < twoMins
                     val micStatusStr = if (isMicActive) "In Use" else "Idle"
                     val micTimeStr = recentMicEvent?.let { 
                         val diffMins = (now - it.timestamp) / 60000 
@@ -170,7 +177,7 @@ fun MonitorScreen(viewModel: MonitorViewModel) {
                     } ?: "NO RECENT DATA"
                     
                     val recentCamEvent = events.firstOrNull { it.permissionType.contains("CAMERA", ignoreCase = true) }
-                    val isCamActive = recentCamEvent != null && (now - recentCamEvent.timestamp) < twoMins
+                    val isCamActive = isServiceRunning && recentCamEvent != null && (now - recentCamEvent.timestamp) < twoMins
                     val camStatusStr = if (isCamActive) "In Use" else "Idle"
                     val camTimeStr = recentCamEvent?.let { 
                         val diffMins = (now - it.timestamp) / 60000 
@@ -190,7 +197,7 @@ fun MonitorScreen(viewModel: MonitorViewModel) {
                     Text("TODAY'S ACTIVITY", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                     Spacer(modifier = Modifier.height(12.dp))
                     
-                    val micCount = events.count { it.permissionType.contains("AUDIO", ignoreCase = true) }
+                    val micCount = events.count { it.permissionType.contains("AUDIO", ignoreCase = true) || it.permissionType.contains("MICROPHONE", ignoreCase = true) }
                     val camCount = events.count { it.permissionType.contains("CAMERA", ignoreCase = true) }
                     
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -214,22 +221,34 @@ fun MonitorScreen(viewModel: MonitorViewModel) {
                 ) {
                     Text("ACCESS TIMELINE", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChipUI(label = "All", isSelected = true)
-                        FilterChipUI(label = "Mic", isSelected = false)
-                        FilterChipUI(label = "Camera", isSelected = false)
+                        FilterChipUI(
+                            label = "All",
+                            isSelected = selectedFilter == MonitorViewModel.MonitorFilter.ALL,
+                            onClick = { viewModel.setFilter(MonitorViewModel.MonitorFilter.ALL) }
+                        )
+                        FilterChipUI(
+                            label = "Mic",
+                            isSelected = selectedFilter == MonitorViewModel.MonitorFilter.MIC,
+                            onClick = { viewModel.setFilter(MonitorViewModel.MonitorFilter.MIC) }
+                        )
+                        FilterChipUI(
+                            label = "Camera",
+                            isSelected = selectedFilter == MonitorViewModel.MonitorFilter.CAMERA,
+                            onClick = { viewModel.setFilter(MonitorViewModel.MonitorFilter.CAMERA) }
+                        )
                     }
                 }
             }
 
             // Timeline Events
-            items(events) { event ->
+            items(filteredEvents) { event ->
                 TimelineEventItem(event)
             }
             
-            if (events.isEmpty()) {
+            if (filteredEvents.isEmpty()) {
                 item {
                     Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                        Text("No events recorded yet.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("No events matching this filter.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -246,11 +265,53 @@ fun MonitorScreen(viewModel: MonitorViewModel) {
             }
         }
     }
+
+    if (showHelpDialog) {
+        AlertDialog(
+            onDismissRequest = { showHelpDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Permission Monitoring Guide", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "PermissionGuard uses background active polling to trace which apps use sensitive sensors.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White
+                    )
+                    Divider(color = MaterialTheme.colorScheme.surfaceVariant)
+                    Text(
+                        "⚙️ To track background apps properly:",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    Text(
+                        "1. Ensure 'Usage Access' permission is granted in System settings.\n" +
+                        "2. Keep the system service 'Active' (Toggle on the switch in this page).\n" +
+                        "3. On Realme/ColorOS, enable 'Disable permission monitoring' in Android Developer Options to avoid OS overrides.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = { showHelpDialog = false }) {
+                    Text("Got it")
+                }
+            },
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    }
 }
 
 @Composable
-fun FilterChipUI(label: String, isSelected: Boolean) {
+fun FilterChipUI(label: String, isSelected: Boolean, onClick: () -> Unit) {
     Surface(
+        onClick = onClick,
         shape = RoundedCornerShape(16.dp),
         color = if (isSelected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surface,
         border = if (!isSelected) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant) else null
@@ -306,7 +367,14 @@ fun ActivityStatCard(modifier: Modifier = Modifier, icon: androidx.compose.ui.gr
             Spacer(modifier = Modifier.width(12.dp))
             Column {
                 Text(count, style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold)
-                Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 0.5.sp)
+                Text(
+                    label, 
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), 
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, 
+                    letterSpacing = 0.sp,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
             }
         }
     }
@@ -314,11 +382,22 @@ fun ActivityStatCard(modifier: Modifier = Modifier, icon: androidx.compose.ui.gr
 
 @Composable
 fun TimelineEventItem(event: PermissionEvent) {
-    val isMic = event.permissionType.contains("AUDIO", ignoreCase = true)
+    val isMic = event.permissionType.contains("AUDIO", ignoreCase = true) || event.permissionType.contains("MICROPHONE", ignoreCase = true)
     val dotColor = if (isMic) MaterialTheme.colorScheme.secondary else Color(0xFFFF3366)
     
-    val format = SimpleDateFormat("hh:mm a", Locale.getDefault())
-    val timeString = format.format(Date(event.timestamp))
+    val format = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault())
+    val timeString = format.format(java.util.Date(event.timestamp))
+    
+    val context = LocalContext.current
+    var appName by remember { mutableStateOf(event.packageName) }
+    
+    LaunchedEffect(event.packageName) {
+        try {
+            val pm = context.packageManager
+            val appInfo = pm.getApplicationInfo(event.packageName, 0)
+            appName = pm.getApplicationLabel(appInfo).toString()
+        } catch (e: Exception) {}
+    }
 
     Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
         // Vertical line + Dot
@@ -348,7 +427,8 @@ fun TimelineEventItem(event: PermissionEvent) {
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text(event.packageName, style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
+                        Text(appName, style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(timeString, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Spacer(modifier = Modifier.height(4.dp))
