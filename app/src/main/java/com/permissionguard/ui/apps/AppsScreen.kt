@@ -16,9 +16,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +35,21 @@ fun AppsScreen(viewModel: AppsViewModel, onAppClick: (String) -> Unit) {
     val searchQuery by viewModel.searchQuery.collectAsState()
     val currentFilter by viewModel.currentFilter.collectAsState()
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var showAboutDialog by remember { mutableStateOf(false) }
+
+    val openDeveloperSettings = {
+        try {
+            val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            try {
+                val intent = android.content.Intent(android.provider.Settings.ACTION_SETTINGS)
+                context.startActivity(intent)
+            } catch (ex: Exception) {}
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -50,7 +63,10 @@ fun AppsScreen(viewModel: AppsViewModel, onAppClick: (String) -> Unit) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable { showAboutDialog = true }
+            ) {
                 Icon(
                     imageVector = Icons.Default.AccountCircle,
                     contentDescription = "Profile",
@@ -68,7 +84,8 @@ fun AppsScreen(viewModel: AppsViewModel, onAppClick: (String) -> Unit) {
             Icon(
                 imageVector = Icons.Default.Settings,
                 contentDescription = "Settings",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.clickable { openDeveloperSettings() }
             )
         }
 
@@ -164,6 +181,33 @@ fun AppsScreen(viewModel: AppsViewModel, onAppClick: (String) -> Unit) {
                 }
             }
         }
+    }
+
+    if (showAboutDialog) {
+        AlertDialog(
+            onDismissRequest = { showAboutDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.AccountCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("About PermissionGuard", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Version: 1.0.0 (Release MVP)", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("PermissionGuard is a state-of-the-art security intelligence suite built to scan, intercept, and secure your Android device from intrusive telemetry and sensor abuse.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                    Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.surfaceVariant)
+                    Text("💡 Developed for advanced privacy scanning and dynamic background sensor auditing.", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.bodySmall)
+                }
+            },
+            confirmButton = {
+                Button(onClick = { showAboutDialog = false }) {
+                    Text("Close")
+                }
+            },
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     }
 }
 
