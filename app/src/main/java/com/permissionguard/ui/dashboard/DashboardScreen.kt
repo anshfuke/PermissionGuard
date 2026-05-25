@@ -3,6 +3,7 @@ package com.permissionguard.ui.dashboard
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -19,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -224,10 +226,21 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                         val format = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault())
                         uiState.recentEvents.forEachIndexed { index, event ->
                             val timeString = format.format(java.util.Date(event.timestamp))
-                            val isMic = event.permissionType.contains("AUDIO", ignoreCase = true)
+                            val isMic = event.permissionType.contains("AUDIO", ignoreCase = true) || event.permissionType.contains("MICROPHONE", ignoreCase = true)
                             val type = if (isMic) "Microphone access" else "Camera access"
                             
-                            Text(event.packageName, color = Color.White, fontWeight = FontWeight.Bold)
+                            val context = LocalContext.current
+                            var appName by remember { mutableStateOf(event.packageName) }
+                            
+                            LaunchedEffect(event.packageName) {
+                                try {
+                                    val pm = context.packageManager
+                                    val appInfo = pm.getApplicationInfo(event.packageName, 0)
+                                    appName = pm.getApplicationLabel(appInfo).toString()
+                                } catch (e: Exception) {}
+                            }
+                            
+                            Text(appName, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                             Text("$type • $timeString", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                             
                             if (index < uiState.recentEvents.size - 1) {

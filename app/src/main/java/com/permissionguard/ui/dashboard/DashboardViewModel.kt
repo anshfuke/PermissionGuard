@@ -51,12 +51,10 @@ class DashboardViewModel(
             val medium = apps.count { it.riskLevel == RiskLevel.MEDIUM }
             val low = apps.count { it.riskLevel == RiskLevel.LOW }
             
-            // Calculate score as the percentage of Safe (Low Risk) apps out of Total apps
-            val finalScore = if (apps.isNotEmpty()) {
-                ((low.toFloat() / apps.size) * 100).toInt().coerceIn(0, 100)
-            } else {
-                100
-            }
+            // Calculate a balanced, weighted security score starting at 100
+            // High risk apps deduct 1.0 point, Medium risk apps deduct 0.25 point
+            val totalDeduction = (high * 1.0f) + (medium * 0.25f)
+            val finalScore = (100f - totalDeduction).toInt().coerceIn(0, 100)
             
             val totalDanger = apps.sumOf { it.dangerousPermissions.size }
             
